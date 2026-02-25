@@ -28,12 +28,40 @@
       <aside class="watchlist" aria-label="Artist assets">
         <div class="watchlist-header">
           <h1>Artist Stocks</h1>
-          <span class="market-pill">Simulated</span>
+          <span id="assetCount" class="market-pill">0 artists</span>
+        </div>
+        <div class="search-wrap">
+          <input
+            id="assetSearch"
+            class="search-input"
+            type="search"
+            placeholder="Search artist or symbol"
+            autocomplete="off"
+            aria-label="Search artists"
+          />
         </div>
         <ul id="assetList" class="asset-list" role="listbox" aria-label="Asset list"></ul>
       </aside>
 
       <main class="main-panel">
+        <section class="topbar-card" aria-label="Market and account summary">
+          <div class="market-summary">
+            <p class="summary-kicker">Music Market</p>
+            <h3>Top 1000 Artists Exchange</h3>
+            <p id="searchMeta" class="summary-copy">Tracking 1000 artists.</p>
+          </div>
+          <div class="account-panel">
+            <p class="account-label">Account</p>
+            <p id="accountName" class="account-name">Demo Trader</p>
+            <div class="account-metrics">
+              <p>Cash: <strong id="accountCash">$0.00</strong></p>
+              <p>Equity: <strong id="accountEquity">$0.00</strong></p>
+              <p>P/L: <strong id="accountPnl">$0.00</strong></p>
+              <p>Open positions: <strong id="accountPositions">0</strong></p>
+            </div>
+          </div>
+        </section>
+
         <section class="chart-card">
           <div class="chart-header">
             <div>

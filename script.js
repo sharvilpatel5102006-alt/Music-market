@@ -4,6 +4,8 @@ const VOLATILITY = 0.007;
 const BUY_IMPACT = 0.012;
 const SELL_IMPACT = -0.012;
 const LISTENER_REFRESH_MS = 60000;
+const TARGET_ARTIST_COUNT = 1000;
+const STARTING_CASH = 25000;
 
 const TOP_ARTISTS = [
   "Taylor Swift",
@@ -58,7 +60,20 @@ const TOP_ARTISTS = [
   "OneRepublic"
 ];
 
-const assets = TOP_ARTISTS.map((name, index) => {
+const EXPANSION_TAGS = [
+  "Live",
+  "Remix",
+  "Sessions",
+  "Collective",
+  "Club",
+  "Era",
+  "House",
+  "Lab"
+];
+
+const allArtistNames = buildTopArtists();
+
+const assets = allArtistNames.map((name, index) => {
   return seedAsset(name, makeSymbol(name, index), basePriceFromIndex(index));
 });
 
@@ -66,12 +81,20 @@ const ui = {
   loginScreen: document.getElementById("loginScreen"),
   loginBtn: document.getElementById("loginBtn"),
   appShell: document.getElementById("appShell"),
+  assetSearch: document.getElementById("assetSearch"),
+  assetCount: document.getElementById("assetCount"),
+  searchMeta: document.getElementById("searchMeta"),
   assetList: document.getElementById("assetList"),
   assetName: document.getElementById("assetName"),
   assetTicker: document.getElementById("assetTicker"),
   assetListeners: document.getElementById("assetListeners"),
   assetPrice: document.getElementById("assetPrice"),
   assetChange: document.getElementById("assetChange"),
+  accountName: document.getElementById("accountName"),
+  accountCash: document.getElementById("accountCash"),
+  accountEquity: document.getElementById("accountEquity"),
+  accountPnl: document.getElementById("accountPnl"),
+  accountPositions: document.getElementById("accountPositions"),
   buyBtn: document.getElementById("buyBtn"),
   sellBtn: document.getElementById("sellBtn"),
   mobileBuyBtn: document.getElementById("mobileBuyBtn"),
@@ -84,12 +107,35 @@ let selectedIndex = 0;
 let chart;
 let listenerReqVersion = 0;
 let marketStarted = false;
+let watchlistTick = 0;
+let filteredIndices = assets.map((_, index) => index);
 const listenerCache = new Map();
+const account = {
+  name: "Sharvil Patel",
+  cash: STARTING_CASH,
+  positions: new Map()
+};
+const assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
 
 function makeSymbol(name, index) {
   const letters = name.replace(/[^A-Za-z]/g, "").toUpperCase();
   const core = (letters.slice(0, 4) || "ART").padEnd(4, "X");
-  return `${core}${String(index + 1).padStart(2, "0")}`;
+  return `${core}${String(index + 1).padStart(4, "0")}`;
+}
+
+function buildTopArtists() {
+  const unique = Array.from(new Set(TOP_ARTISTS));
+  let index = 0;
+
+  while (unique.length < TARGET_ARTIST_COUNT) {
+    const base = TOP_ARTISTS[index % TOP_ARTISTS.length];
+    const tag = EXPANSION_TAGS[index % EXPANSION_TAGS.length];
+    const era = Math.floor(index / TOP_ARTISTS.length) + 1;
+    unique.push(`${base} ${tag} ${era}`);
+    index += 1;
+  }
+
+  return unique.slice(0, TARGET_ARTIST_COUNT);
 }
 
 function basePriceFromIndex(index) {
@@ -159,6 +205,14 @@ function formatPrice(value) {
 function formatChange(value) {
   const sign = value >= 0 ? "+" : "";
   return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2
+  }).format(value);
 }
 
 function formatListeners(value) {
@@ -232,8 +286,96 @@ async function refreshListenersForSelected(force) {
   }
 }
 
+function getPortfolioValue() {
+  let total = 0;
+  account.positions.forEach((shares, symbol) => {
+    const asset = assetBySymbol.get(symbol);
+    if (asset) {
+      total += shares * asset.price;
+    }
+  });
+  return total;
+}
+
+function getOpenPositionCount() {
+  let count = 0;
+  account.positions.forEach((shares) => {
+    if (shares > 0) {
+      count += 1;
+    }
+  });
+  return count;
+}
+
+function updateAccountPanel() {
+  if (!ui.accountName || !ui.accountCash || !ui.accountEquity || !ui.accountPnl || !ui.accountPositions) {
+    return;
+  }
+
+  const equity = account.cash + getPortfolioValue();
+  const pnl = equity - STARTING_CASH;
+
+  ui.accountName.textContent = account.name;
+  ui.accountCash.textContent = formatCurrency(account.cash);
+  ui.accountEquity.textContent = formatCurrency(equity);
+  ui.accountPnl.textContent = `${pnl >= 0 ? "+" : ""}${formatCurrency(pnl)}`;
+  ui.accountPositions.textContent = String(getOpenPositionCount());
+  setChangeClass(ui.accountPnl, pnl);
+}
+
+function updateSearchMeta() {
+  if (!ui.assetCount || !ui.searchMeta || !ui.assetSearch) {
+    return;
+  }
+
+  const showing = filteredIndices.length;
+  const total = assets.length;
+  const searchValue = ui.assetSearch.value.trim();
+
+  ui.assetCount.textContent = `${total} artists`;
+  ui.searchMeta.textContent = searchValue
+    ? `Showing ${showing} match${showing === 1 ? "" : "es"} for "${searchValue}".`
+    : `Tracking ${total} artists in market simulation.`;
+}
+
+function applySearchFilter() {
+  if (!ui.assetSearch) {
+    return;
+  }
+
+  const query = ui.assetSearch.value.trim().toLowerCase();
+
+  if (!query) {
+    filteredIndices = assets.map((_, index) => index);
+  } else {
+    filteredIndices = assets
+      .map((asset, index) => ({ asset, index }))
+      .filter(({ asset }) => {
+        return (
+          asset.name.toLowerCase().includes(query) ||
+          asset.symbol.toLowerCase().includes(query)
+        );
+      })
+      .map(({ index }) => index);
+  }
+
+  if (!filteredIndices.includes(selectedIndex)) {
+    selectedIndex = filteredIndices[0] ?? 0;
+  }
+
+  updateSearchMeta();
+  renderWatchlist();
+  renderSelectedAsset();
+  updateChart();
+  refreshListenersForSelected(true);
+}
+
 function selectAsset(index) {
-  selectedIndex = (index + assets.length) % assets.length;
+  if (!Number.isInteger(index) || index < 0 || index >= assets.length) {
+    return;
+  }
+
+  selectedIndex = index;
   renderWatchlist();
   renderSelectedAsset();
   updateChart();
@@ -243,7 +385,16 @@ function selectAsset(index) {
 function renderWatchlist() {
   ui.assetList.innerHTML = "";
 
-  assets.forEach((asset, index) => {
+  if (filteredIndices.length === 0) {
+    const empty = document.createElement("li");
+    empty.className = "asset-item";
+    empty.textContent = "No artists found. Try another search.";
+    ui.assetList.appendChild(empty);
+    return;
+  }
+
+  filteredIndices.forEach((index) => {
+    const asset = assets[index];
     const li = document.createElement("li");
     li.className = `asset-item${index === selectedIndex ? " active" : ""}`;
     li.setAttribute("role", "option");
@@ -268,6 +419,16 @@ function renderWatchlist() {
 
 function renderSelectedAsset() {
   const asset = assets[selectedIndex];
+
+  if (!asset) {
+    ui.assetName.textContent = "-";
+    ui.assetTicker.textContent = "-";
+    ui.assetPrice.textContent = "$0.00";
+    ui.assetChange.textContent = "0.00%";
+    ui.assetListeners.textContent = "Active listeners: --";
+    return;
+  }
+
   const change = pctFromOpen(asset);
 
   ui.assetName.textContent = asset.name;
@@ -354,23 +515,64 @@ function updateChart() {
   }
 
   const asset = assets[selectedIndex];
+  if (!asset) {
+    return;
+  }
+
   chart.data.labels = chartLabels(asset.history.length);
   chart.data.datasets[0].data = asset.history;
   chart.update();
 }
 
 function executeTrade(impactPct) {
-  impactTrade(assets[selectedIndex], impactPct);
+  const asset = assets[selectedIndex];
+  if (!asset) {
+    return;
+  }
+
+  const currentShares = account.positions.get(asset.symbol) || 0;
+
+  if (impactPct > 0) {
+    if (account.cash < asset.price) {
+      return;
+    }
+    account.cash = Number((account.cash - asset.price).toFixed(2));
+    account.positions.set(asset.symbol, currentShares + 1);
+  } else {
+    if (currentShares <= 0) {
+      return;
+    }
+    account.cash = Number((account.cash + asset.price).toFixed(2));
+    account.positions.set(asset.symbol, currentShares - 1);
+  }
+
+  impactTrade(asset, impactPct);
   renderWatchlist();
   renderSelectedAsset();
+  updateAccountPanel();
   updateChart();
 }
 
 function stepSimulation() {
   assets.forEach(tickAsset);
-  renderWatchlist();
+  watchlistTick += 1;
+  if (watchlistTick % 3 === 0) {
+    renderWatchlist();
+  }
   renderSelectedAsset();
+  updateAccountPanel();
   updateChart();
+}
+
+function selectByOffset(offset) {
+  if (filteredIndices.length === 0) {
+    return;
+  }
+
+  const currentPos = filteredIndices.indexOf(selectedIndex);
+  const safePos = currentPos === -1 ? 0 : currentPos;
+  const nextPos = (safePos + offset + filteredIndices.length) % filteredIndices.length;
+  selectAsset(filteredIndices[nextPos]);
 }
 
 function initTrades() {
@@ -391,11 +593,11 @@ function initTrades() {
   });
 
   ui.prevAssetBtn.addEventListener("click", () => {
-    selectAsset(selectedIndex - 1);
+    selectByOffset(-1);
   });
 
   ui.nextAssetBtn.addEventListener("click", () => {
-    selectAsset(selectedIndex + 1);
+    selectByOffset(1);
   });
 }
 
@@ -409,6 +611,8 @@ function initMarket() {
   renderSelectedAsset();
   buildChart();
   initTrades();
+  updateAccountPanel();
+  updateSearchMeta();
   refreshListenersForSelected(true);
   setInterval(stepSimulation, TICK_MS);
   setInterval(() => refreshListenersForSelected(false), LISTENER_REFRESH_MS);
@@ -442,6 +646,10 @@ function init() {
 
   if (ui.loginBtn) {
     ui.loginBtn.addEventListener("click", enterApp);
+  }
+
+  if (ui.assetSearch) {
+    ui.assetSearch.addEventListener("input", applySearchFilter);
   }
 }
 

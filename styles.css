@@ -133,6 +133,27 @@ body.login-active {
   justify-content: space-between;
 }
 
+.search-wrap {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.search-input {
+  width: 100%;
+  border: 1px solid #2a3d5d;
+  background: #0c1628;
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  outline: none;
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(77, 163, 255, 0.2);
+}
+
 .watchlist-header h1 {
   margin: 0;
   font-size: 1.12rem;
@@ -212,9 +233,82 @@ body.login-active {
 
 .main-panel {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: auto 1fr auto;
   gap: 20px;
   min-height: 0;
+}
+
+.topbar-card {
+  background: linear-gradient(180deg, #111e33 0%, #0d182a 100%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.summary-kicker {
+  margin: 0;
+  color: #8fc0ff;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+  font-size: 0.76rem;
+}
+
+.market-summary h3 {
+  margin: 6px 0 0;
+  font-size: 1.2rem;
+}
+
+.summary-copy {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.account-panel {
+  min-width: 260px;
+  background: #0b1424;
+  border: 1px solid #233856;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+
+.account-label {
+  margin: 0;
+  color: #8ab8fb;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.account-name {
+  margin: 4px 0 10px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.account-metrics {
+  display: grid;
+  gap: 6px;
+}
+
+.account-metrics p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.account-metrics strong.positive {
+  color: var(--positive);
+}
+
+.account-metrics strong.negative {
+  color: var(--negative);
 }
 
 .chart-card {
@@ -353,6 +447,10 @@ button:active {
     padding: 12px 14px;
   }
 
+  .search-wrap {
+    padding: 10px 12px;
+  }
+
   .asset-list {
     display: grid;
     grid-auto-flow: column;
@@ -384,6 +482,25 @@ button:active {
   .chart-card {
     padding: 14px;
     gap: 14px;
+  }
+
+  .topbar-card {
+    flex-direction: column;
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .market-summary h3 {
+    font-size: 1.02rem;
+  }
+
+  .summary-copy {
+    font-size: 0.82rem;
+  }
+
+  .account-panel {
+    min-width: 0;
+    width: 100%;
   }
 
   .chart-header h2 {
@@ -442,6 +559,10 @@ button:active {
   .market-pill {
     font-size: 0.7rem;
     padding: 4px 8px;
+  }
+
+  .search-input {
+    font-size: 0.92rem;
   }
 
   .asset-list {
