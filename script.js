@@ -131,6 +131,20 @@ function buildFallbackArtists(totalCount) {
   return Array.from(new Set(TOP_ARTISTS)).slice(0, totalCount);
 }
 
+function isGeneratedStyleName(name) {
+  const normalized = name.toLowerCase();
+  return (
+    normalized.includes(" vol.") ||
+    normalized.includes(" remix") ||
+    normalized.includes(" sessions") ||
+    normalized.includes(" collective") ||
+    normalized.includes(" club") ||
+    normalized.includes(" era") ||
+    normalized.includes(" house") ||
+    normalized.includes(" lab")
+  );
+}
+
 function resetMarketData(artistNames) {
   const names = artistNames.slice(0, TARGET_ARTIST_COUNT);
   const rebuiltAssets = buildAssetsFromNames(names);
@@ -172,6 +186,7 @@ function parseTopArtistsFromChartmasters(text) {
       rank < 1 ||
       rank > TARGET_ARTIST_COUNT ||
       !artistName ||
+      isGeneratedStyleName(artistName) ||
       seen.has(artistName)
     ) {
       return;
@@ -225,7 +240,7 @@ async function loadRealArtistsFromWikidata() {
 
   bindings.forEach((item) => {
     const name = (item?.artistLabel?.value || "").trim();
-    if (!name || seen.has(name)) {
+    if (!name || isGeneratedStyleName(name) || seen.has(name)) {
       return;
     }
     seen.add(name);
