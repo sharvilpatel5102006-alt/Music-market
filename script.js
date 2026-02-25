@@ -3,24 +3,73 @@ const TICK_MS = 2400;
 const VOLATILITY = 0.007;
 const BUY_IMPACT = 0.012;
 const SELL_IMPACT = -0.012;
+const LISTENER_REFRESH_MS = 60000;
 
-const assets = [
-  seedAsset("Blinding Lights", "BLND", 142.4),
-  seedAsset("Levitating", "LEVT", 116.35),
-  seedAsset("As It Was", "AITW", 98.8),
-  seedAsset("Cruel Summer", "CRSM", 132.7),
-  seedAsset("Unholy", "UNHY", 105.95),
-  seedAsset("Calm Down", "CLMD", 87.25)
+const TOP_ARTISTS = [
+  "Taylor Swift",
+  "Drake",
+  "The Weeknd",
+  "Bad Bunny",
+  "SZA",
+  "Travis Scott",
+  "Kendrick Lamar",
+  "Post Malone",
+  "Ariana Grande",
+  "Olivia Rodrigo",
+  "Billie Eilish",
+  "Doja Cat",
+  "Dua Lipa",
+  "Morgan Wallen",
+  "Luke Combs",
+  "Zach Bryan",
+  "Ed Sheeran",
+  "Justin Bieber",
+  "Rihanna",
+  "Beyonce",
+  "Bruno Mars",
+  "Lady Gaga",
+  "Selena Gomez",
+  "Miley Cyrus",
+  "Sabrina Carpenter",
+  "Chappell Roan",
+  "Tate McRae",
+  "Noah Kahan",
+  "Hozier",
+  "Lil Baby",
+  "Future",
+  "Metro Boomin",
+  "21 Savage",
+  "J. Cole",
+  "Tyler, The Creator",
+  "Playboi Carti",
+  "Karol G",
+  "Feid",
+  "Peso Pluma",
+  "Shakira",
+  "Anitta",
+  "Rosalia",
+  "BTS",
+  "Jung Kook",
+  "BLACKPINK",
+  "NewJeans",
+  "Stray Kids",
+  "Coldplay",
+  "Imagine Dragons",
+  "OneRepublic"
 ];
+
+const assets = TOP_ARTISTS.map((name, index) => {
+  return seedAsset(name, makeSymbol(name, index), basePriceFromIndex(index));
+});
 
 const ui = {
   loginScreen: document.getElementById("loginScreen"),
-  loginForm: document.getElementById("loginForm"),
   loginBtn: document.getElementById("loginBtn"),
   appShell: document.getElementById("appShell"),
   assetList: document.getElementById("assetList"),
   assetName: document.getElementById("assetName"),
   assetTicker: document.getElementById("assetTicker"),
+  assetListeners: document.getElementById("assetListeners"),
   assetPrice: document.getElementById("assetPrice"),
   assetChange: document.getElementById("assetChange"),
   buyBtn: document.getElementById("buyBtn"),
@@ -33,7 +82,20 @@ const ui = {
 
 let selectedIndex = 0;
 let chart;
-let appStarted = false;
+let listenerReqVersion = 0;
+let marketStarted = false;
+const listenerCache = new Map();
+
+function makeSymbol(name, index) {
+  const letters = name.replace(/[^A-Za-z]/g, "").toUpperCase();
+  const core = (letters.slice(0, 4) || "ART").padEnd(4, "X");
+  return `${core}${String(index + 1).padStart(2, "0")}`;
+}
+
+function basePriceFromIndex(index) {
+  const base = 72 + index * 1.95 + (index % 6) * 2.1;
+  return Number(base.toFixed(2));
+}
 
 function seedAsset(name, symbol, basePrice) {
   const history = [];
@@ -99,9 +161,75 @@ function formatChange(value) {
   return `${sign}${value.toFixed(2)}%`;
 }
 
+function formatListeners(value) {
+  return Number(value).toLocaleString("en-US");
+}
+
 function setChangeClass(el, value) {
   el.classList.remove("positive", "negative");
   el.classList.add(value >= 0 ? "positive" : "negative");
+}
+
+function syntheticListeners(asset) {
+  const base = Math.round(asset.price * 12200);
+  const jitter = Math.round((Math.sin(asset.price) + 1) * 26000);
+  return Math.max(25000, base + jitter);
+}
+
+function showListeners(asset) {
+  const item = listenerCache.get(asset.symbol);
+
+  if (!item) {
+    ui.assetListeners.textContent = "Active listeners: --";
+    return;
+  }
+
+  ui.assetListeners.textContent = `Active listeners: ${formatListeners(item.listeners)} (${item.source})`;
+}
+
+async function refreshListenersForSelected(force) {
+  const asset = assets[selectedIndex];
+  const cached = listenerCache.get(asset.symbol);
+  const now = Date.now();
+
+  if (!force && cached && now - cached.fetchedAt < LISTENER_REFRESH_MS) {
+    showListeners(asset);
+    return;
+  }
+
+  const reqId = ++listenerReqVersion;
+  ui.assetListeners.textContent = "Active listeners: loading...";
+
+  try {
+    const response = await fetch(`/api/artist-metrics?artist=${encodeURIComponent(asset.name)}`);
+
+    if (!response.ok) {
+      throw new Error(`metric api returned ${response.status}`);
+    }
+
+    const payload = await response.json();
+    const listeners = Number(payload.listeners);
+
+    if (!Number.isFinite(listeners)) {
+      throw new Error("missing listeners value");
+    }
+
+    listenerCache.set(asset.symbol, {
+      listeners: Math.round(listeners),
+      source: payload.source || "provider",
+      fetchedAt: now
+    });
+  } catch (error) {
+    listenerCache.set(asset.symbol, {
+      listeners: syntheticListeners(asset),
+      source: "fallback",
+      fetchedAt: now
+    });
+  }
+
+  if (reqId === listenerReqVersion) {
+    showListeners(asset);
+  }
 }
 
 function selectAsset(index) {
@@ -109,6 +237,7 @@ function selectAsset(index) {
   renderWatchlist();
   renderSelectedAsset();
   updateChart();
+  refreshListenersForSelected(true);
 }
 
 function renderWatchlist() {
@@ -146,6 +275,7 @@ function renderSelectedAsset() {
   ui.assetPrice.textContent = formatPrice(asset.price);
   ui.assetChange.textContent = formatChange(change);
   setChangeClass(ui.assetChange, change);
+  showListeners(asset);
 }
 
 function chartLabels(size) {
@@ -169,11 +299,11 @@ function buildChart() {
         {
           data: asset.history,
           borderWidth: 2.4,
-          borderColor: "#0f6df5",
+          borderColor: "#4da3ff",
           pointRadius: 0,
           tension: 0.35,
           fill: true,
-          backgroundColor: "rgba(15, 109, 245, 0.08)"
+          backgroundColor: "rgba(77, 163, 255, 0.18)"
         }
       ]
     },
@@ -186,6 +316,11 @@ function buildChart() {
         legend: { display: false },
         tooltip: {
           displayColors: false,
+          backgroundColor: "#101a2c",
+          titleColor: "#dce7fa",
+          bodyColor: "#dce7fa",
+          borderColor: "#2a3b5a",
+          borderWidth: 1,
           callbacks: {
             label(context) {
               return `Price: ${formatPrice(context.raw)}`;
@@ -200,8 +335,9 @@ function buildChart() {
           ticks: { display: false }
         },
         y: {
-          grid: { color: "#ecf1f8" },
+          grid: { color: "#24344f" },
           ticks: {
+            color: "#97a9c8",
             callback(value) {
               return `$${value}`;
             }
@@ -263,40 +399,29 @@ function initTrades() {
   });
 }
 
-function initApp() {
-  if (appStarted) {
+function initMarket() {
+  if (marketStarted) {
     return;
   }
 
-  appStarted = true;
+  marketStarted = true;
   renderWatchlist();
   renderSelectedAsset();
   buildChart();
   initTrades();
+  refreshListenersForSelected(true);
   setInterval(stepSimulation, TICK_MS);
+  setInterval(() => refreshListenersForSelected(false), LISTENER_REFRESH_MS);
 }
 
 function enterApp() {
   ui.loginScreen.classList.add("app-hidden");
   ui.appShell.classList.remove("app-hidden");
-  initApp();
-}
-
-function initLogin() {
-  ui.loginForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    enterApp();
-  });
-
-  ui.loginBtn.addEventListener("click", () => {
-    enterApp();
-  });
-
-  window.enterApp = enterApp;
+  initMarket();
 }
 
 function init() {
-  initLogin();
+  ui.loginBtn.addEventListener("click", enterApp);
 }
 
 init();
