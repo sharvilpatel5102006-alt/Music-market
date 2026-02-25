@@ -8,8 +8,17 @@ const TARGET_ARTIST_COUNT = 500;
 const STARTING_CASH = 25000;
 const KWORB_SOURCE_URLS = [
   "https://r.jina.ai/http://kworb.net/spotify/listeners.html",
-  "https://r.jina.ai/http://kworb.net/spotify/listeners.html?show=all"
+  "https://r.jina.ai/http://kworb.net/spotify/listeners.html?show=all",
+  "https://kworb.net/spotify/listeners.html"
 ];
+const WIKIDATA_SPOTIFY_ARTISTS_API =
+  "https://query.wikidata.org/sparql?format=json&query=" +
+  encodeURIComponent(
+    "SELECT ?artistLabel WHERE { " +
+      "?artist wdt:P2205 ?spotifyId. " +
+      "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". } " +
+    "} LIMIT 2500"
+  );
 
 const TOP_ARTISTS = [
   "Bruno Mars",
@@ -382,7 +391,7 @@ async function fetchTextWithTimeout(url, timeoutMs) {
 async function loadTopArtistsFromKworb() {
   for (const sourceUrl of KWORB_SOURCE_URLS) {
     try {
-      const sourceText = await fetchTextWithTimeout(sourceUrl, 12000);
+      const sourceText = await fetchTextWithTimeout(sourceUrl, 30000);
       const parsedNames = parseTopArtistsFromKworb(sourceText);
 
       if (parsedNames.length >= TARGET_ARTIST_COUNT) {
@@ -394,6 +403,25 @@ async function loadTopArtistsFromKworb() {
   }
 
   throw new Error("could not load kworb top artists");
+}
+
+async function loadRealArtistsFromWikidata() {
+  const sourceText = await fetchTextWithTimeout(WIKIDATA_SPOTIFY_ARTISTS_API, 30000);
+  const payload = JSON.parse(sourceText);
+  const bindings = payload?.results?.bindings || [];
+  const seen = new Set();
+  const names = [];
+
+  bindings.forEach((item) => {
+    const name = normalizeArtistName(item?.artistLabel?.value || "");
+    if (!name || isGeneratedStyleName(name) || seen.has(name.toLowerCase())) {
+      return;
+    }
+    seen.add(name.toLowerCase());
+    names.push(name);
+  });
+
+  return prioritizePopularArtists(names).slice(0, TARGET_ARTIST_COUNT);
 }
 
 function basePriceFromIndex(index) {
@@ -866,11 +894,19 @@ async function initMarket() {
 
   try {
     const kworbArtists = await loadTopArtistsFromKworb();
-    resetMarketData(kworbArtists);
+    const prioritized = prioritizePopularArtists(kworbArtists);
+    resetMarketData(prioritized);
     artistDataSource = "kworb top 500 snapshot";
   } catch (error) {
-    resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
-    artistDataSource = "local fallback list";
+    try {
+      const wikiArtists = await loadRealArtistsFromWikidata();
+      resetMarketData(wikiArtists);
+      artistDataSource = "wikidata top artists fallback";
+    } catch (nestedError) {
+      const prioritizedLocal = prioritizePopularArtists(buildFallbackArtists(TARGET_ARTIST_COUNT));
+      resetMarketData(prioritizedLocal);
+      artistDataSource = "local fallback list";
+    }
   }
 
   marketStarted = true;
