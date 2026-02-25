@@ -6,6 +6,10 @@ const SELL_IMPACT = -0.012;
 const LISTENER_REFRESH_MS = 60000;
 const TARGET_ARTIST_COUNT = 1000;
 const STARTING_CASH = 25000;
+const REAL_ARTISTS_SOURCE_URLS = [
+  "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/",
+  "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/?view=list"
+];
 
 const TOP_ARTISTS = [
   "Taylor Swift",
@@ -60,22 +64,7 @@ const TOP_ARTISTS = [
   "OneRepublic"
 ];
 
-const EXPANSION_TAGS = [
-  "Live",
-  "Remix",
-  "Sessions",
-  "Collective",
-  "Club",
-  "Era",
-  "House",
-  "Lab"
-];
-
-const allArtistNames = buildTopArtists();
-
-const assets = allArtistNames.map((name, index) => {
-  return seedAsset(name, makeSymbol(name, index), basePriceFromIndex(index));
-});
+const assets = buildAssetsFromNames(buildFallbackArtists(TARGET_ARTIST_COUNT));
 
 const ui = {
   loginScreen: document.getElementById("loginScreen"),
@@ -109,13 +98,14 @@ let listenerReqVersion = 0;
 let marketStarted = false;
 let watchlistTick = 0;
 let filteredIndices = assets.map((_, index) => index);
+let artistDataSource = "fallback seed list";
 const listenerCache = new Map();
 const account = {
   name: "Sharvil Patel",
   cash: STARTING_CASH,
   positions: new Map()
 };
-const assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
+let assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
 
 function makeSymbol(name, index) {
   const letters = name.replace(/[^A-Za-z]/g, "").toUpperCase();
@@ -123,19 +113,111 @@ function makeSymbol(name, index) {
   return `${core}${String(index + 1).padStart(4, "0")}`;
 }
 
-function buildTopArtists() {
-  const unique = Array.from(new Set(TOP_ARTISTS));
-  let index = 0;
+function buildAssetsFromNames(names) {
+  return names.map((name, index) => {
+    return seedAsset(name, makeSymbol(name, index), basePriceFromIndex(index));
+  });
+}
 
-  while (unique.length < TARGET_ARTIST_COUNT) {
-    const base = TOP_ARTISTS[index % TOP_ARTISTS.length];
-    const tag = EXPANSION_TAGS[index % EXPANSION_TAGS.length];
-    const era = Math.floor(index / TOP_ARTISTS.length) + 1;
-    unique.push(`${base} ${tag} ${era}`);
-    index += 1;
+function buildFallbackArtists(totalCount) {
+  const unique = Array.from(new Set(TOP_ARTISTS));
+  let page = 1;
+
+  while (unique.length < totalCount) {
+    TOP_ARTISTS.forEach((name) => {
+      if (unique.length < totalCount) {
+        unique.push(`${name} Vol.${page}`);
+      }
+    });
+    page += 1;
   }
 
-  return unique.slice(0, TARGET_ARTIST_COUNT);
+  return unique.slice(0, totalCount);
+}
+
+function resetMarketData(artistNames) {
+  const names = artistNames.slice(0, TARGET_ARTIST_COUNT);
+  const rebuiltAssets = buildAssetsFromNames(names);
+  assets.length = 0;
+  assets.push(...rebuiltAssets);
+
+  assetBySymbol = new Map(assets.map((asset) => [asset.symbol, asset]));
+  selectedIndex = 0;
+  watchlistTick = 0;
+  filteredIndices = assets.map((_, index) => index);
+  listenerReqVersion = 0;
+  listenerCache.clear();
+
+  account.cash = STARTING_CASH;
+  account.positions.clear();
+
+  if (ui.assetSearch) {
+    ui.assetSearch.value = "";
+  }
+}
+
+function parseTopArtistsFromChartmasters(text) {
+  const lines = text.split("\n");
+  const names = [];
+  const seen = new Set();
+
+  lines.forEach((line) => {
+    const cleaned = line.trim();
+    const match = cleaned.match(/^(\d{1,4})\s+(.+?)\s+(\d[\d,]*)$/);
+    if (!match) {
+      return;
+    }
+
+    const rank = Number(match[1]);
+    const artistName = match[2].replace(/\s+/g, " ").trim();
+
+    if (
+      Number.isNaN(rank) ||
+      rank < 1 ||
+      rank > TARGET_ARTIST_COUNT ||
+      !artistName ||
+      seen.has(artistName)
+    ) {
+      return;
+    }
+
+    seen.add(artistName);
+    names.push(artistName);
+  });
+
+  return names;
+}
+
+async function fetchTextWithTimeout(url, timeoutMs) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`source returned ${response.status}`);
+    }
+    return await response.text();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function loadRealTopArtists() {
+  for (const sourceUrl of REAL_ARTISTS_SOURCE_URLS) {
+    try {
+      const sourceText = await fetchTextWithTimeout(sourceUrl, 12000);
+      const parsedNames = parseTopArtistsFromChartmasters(sourceText);
+
+      if (parsedNames.length >= TARGET_ARTIST_COUNT) {
+        return parsedNames.slice(0, TARGET_ARTIST_COUNT);
+      }
+    } catch (error) {
+      continue;
+    }
+  }
+
+  throw new Error("could not load real top artists");
 }
 
 function basePriceFromIndex(index) {
@@ -335,7 +417,7 @@ function updateSearchMeta() {
   ui.assetCount.textContent = `${total} artists`;
   ui.searchMeta.textContent = searchValue
     ? `Showing ${showing} match${showing === 1 ? "" : "es"} for "${searchValue}".`
-    : `Tracking ${total} artists in market simulation.`;
+    : `Tracking ${total} artists (${artistDataSource}).`;
 }
 
 function applySearchFilter() {
@@ -601,9 +683,18 @@ function initTrades() {
   });
 }
 
-function initMarket() {
+async function initMarket() {
   if (marketStarted) {
     return;
+  }
+
+  try {
+    const realArtists = await loadRealTopArtists();
+    resetMarketData(realArtists);
+    artistDataSource = "live real artists";
+  } catch (error) {
+    resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
+    artistDataSource = "fallback seed list";
   }
 
   marketStarted = true;
@@ -618,7 +709,7 @@ function initMarket() {
   setInterval(() => refreshListenersForSelected(false), LISTENER_REFRESH_MS);
 }
 
-function enterApp() {
+async function enterApp() {
   if (ui.loginScreen) {
     ui.loginScreen.classList.add("app-hidden");
   }
@@ -630,7 +721,7 @@ function enterApp() {
   document.body.classList.remove("login-active");
   document.documentElement.style.overflow = "";
   document.body.style.overflow = "";
-  initMarket();
+  await initMarket();
 }
 
 function init() {
@@ -645,7 +736,9 @@ function init() {
   document.body.classList.add("login-active");
 
   if (ui.loginBtn) {
-    ui.loginBtn.addEventListener("click", enterApp);
+    ui.loginBtn.addEventListener("click", () => {
+      void enterApp();
+    });
   }
 
   if (ui.assetSearch) {
