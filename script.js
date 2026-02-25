@@ -421,7 +421,10 @@ function enterApp() {
 }
 
 function init() {
-  ui.loginBtn.addEventListener("click", enterApp);
+  if (ui.loginBtn) {
+    ui.loginBtn.addEventListener("click", enterApp);
+  }
 }
 
+window.enterApp = enterApp;
 init();
