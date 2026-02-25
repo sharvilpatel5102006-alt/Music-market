@@ -415,8 +415,18 @@ function initMarket() {
 }
 
 function enterApp() {
-  ui.loginScreen.classList.add("app-hidden");
-  ui.appShell.classList.remove("app-hidden");
+  if (ui.loginScreen) {
+    ui.loginScreen.style.display = "none";
+    ui.loginScreen.classList.add("app-hidden");
+  }
+
+  if (ui.appShell) {
+    ui.appShell.style.display = "grid";
+    ui.appShell.classList.remove("app-hidden");
+  }
+
+  document.documentElement.style.overflow = "auto";
+  document.body.style.overflow = "auto";
   initMarket();
 }
 

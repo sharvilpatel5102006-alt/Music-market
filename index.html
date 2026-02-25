@@ -20,11 +20,11 @@
         <p class="login-kicker">Music Market</p>
         <h1>Welcome Back</h1>
         <p class="login-copy">Tap once to enter your artist market dashboard.</p>
-        <button id="loginBtn" class="login-btn" type="button" onclick="window.enterApp && window.enterApp()">Log In</button>
+        <button id="loginBtn" class="login-btn" type="button" onclick="document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='grid';if(window.enterApp){window.enterApp();}">Log In</button>
       </div>
     </section>
 
-    <div id="appShell" class="app-shell app-hidden">
+    <div id="appShell" class="app-shell app-hidden" style="display:none">
       <aside class="watchlist" aria-label="Artist assets">
         <div class="watchlist-header">
           <h1>Artist Stocks</h1>
