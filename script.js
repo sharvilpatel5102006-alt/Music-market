@@ -14,17 +14,26 @@ const assets = [
 ];
 
 const ui = {
+  loginScreen: document.getElementById("loginScreen"),
+  loginForm: document.getElementById("loginForm"),
+  loginBtn: document.getElementById("loginBtn"),
+  appShell: document.getElementById("appShell"),
   assetList: document.getElementById("assetList"),
   assetName: document.getElementById("assetName"),
   assetTicker: document.getElementById("assetTicker"),
   assetPrice: document.getElementById("assetPrice"),
   assetChange: document.getElementById("assetChange"),
   buyBtn: document.getElementById("buyBtn"),
-  sellBtn: document.getElementById("sellBtn")
+  sellBtn: document.getElementById("sellBtn"),
+  mobileBuyBtn: document.getElementById("mobileBuyBtn"),
+  mobileSellBtn: document.getElementById("mobileSellBtn"),
+  prevAssetBtn: document.getElementById("prevAssetBtn"),
+  nextAssetBtn: document.getElementById("nextAssetBtn")
 };
 
 let selectedIndex = 0;
 let chart;
+let appStarted = false;
 
 function seedAsset(name, symbol, basePrice) {
   const history = [];
@@ -95,6 +104,13 @@ function setChangeClass(el, value) {
   el.classList.add(value >= 0 ? "positive" : "negative");
 }
 
+function selectAsset(index) {
+  selectedIndex = (index + assets.length) % assets.length;
+  renderWatchlist();
+  renderSelectedAsset();
+  updateChart();
+}
+
 function renderWatchlist() {
   ui.assetList.innerHTML = "";
 
@@ -114,10 +130,7 @@ function renderWatchlist() {
     `;
 
     li.addEventListener("click", () => {
-      selectedIndex = index;
-      renderWatchlist();
-      renderSelectedAsset();
-      updateChart();
+      selectAsset(index);
     });
 
     ui.assetList.appendChild(li);
@@ -140,6 +153,11 @@ function chartLabels(size) {
 }
 
 function buildChart() {
+  if (typeof Chart === "undefined") {
+    chart = null;
+    return;
+  }
+
   const asset = assets[selectedIndex];
   const ctx = document.getElementById("priceChart");
 
@@ -195,10 +213,21 @@ function buildChart() {
 }
 
 function updateChart() {
+  if (!chart) {
+    return;
+  }
+
   const asset = assets[selectedIndex];
   chart.data.labels = chartLabels(asset.history.length);
   chart.data.datasets[0].data = asset.history;
   chart.update();
+}
+
+function executeTrade(impactPct) {
+  impactTrade(assets[selectedIndex], impactPct);
+  renderWatchlist();
+  renderSelectedAsset();
+  updateChart();
 }
 
 function stepSimulation() {
@@ -210,26 +239,64 @@ function stepSimulation() {
 
 function initTrades() {
   ui.buyBtn.addEventListener("click", () => {
-    impactTrade(assets[selectedIndex], BUY_IMPACT);
-    renderWatchlist();
-    renderSelectedAsset();
-    updateChart();
+    executeTrade(BUY_IMPACT);
   });
 
   ui.sellBtn.addEventListener("click", () => {
-    impactTrade(assets[selectedIndex], SELL_IMPACT);
-    renderWatchlist();
-    renderSelectedAsset();
-    updateChart();
+    executeTrade(SELL_IMPACT);
+  });
+
+  ui.mobileBuyBtn.addEventListener("click", () => {
+    executeTrade(BUY_IMPACT);
+  });
+
+  ui.mobileSellBtn.addEventListener("click", () => {
+    executeTrade(SELL_IMPACT);
+  });
+
+  ui.prevAssetBtn.addEventListener("click", () => {
+    selectAsset(selectedIndex - 1);
+  });
+
+  ui.nextAssetBtn.addEventListener("click", () => {
+    selectAsset(selectedIndex + 1);
   });
 }
 
-function init() {
+function initApp() {
+  if (appStarted) {
+    return;
+  }
+
+  appStarted = true;
   renderWatchlist();
   renderSelectedAsset();
   buildChart();
   initTrades();
   setInterval(stepSimulation, TICK_MS);
+}
+
+function enterApp() {
+  ui.loginScreen.classList.add("app-hidden");
+  ui.appShell.classList.remove("app-hidden");
+  initApp();
+}
+
+function initLogin() {
+  ui.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    enterApp();
+  });
+
+  ui.loginBtn.addEventListener("click", () => {
+    enterApp();
+  });
+
+  window.enterApp = enterApp;
+}
+
+function init() {
+  initLogin();
 }
 
 init();

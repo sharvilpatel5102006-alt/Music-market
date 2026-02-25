@@ -15,7 +15,18 @@
     <script src="script.js" defer></script>
   </head>
   <body>
-    <div class="app-shell">
+    <section id="loginScreen" class="login-screen" aria-label="Login">
+      <div class="login-card">
+        <p class="login-kicker">Music Market</p>
+        <h1>Log in</h1>
+        <p class="login-copy">Click below to enter the simulated trading interface.</p>
+        <form id="loginForm" class="login-form">
+          <button id="loginBtn" class="login-btn" type="submit">Log In</button>
+        </form>
+      </div>
+    </section>
+
+    <div id="appShell" class="app-shell app-hidden">
       <aside class="watchlist" aria-label="Music assets">
         <div class="watchlist-header">
           <h1>Music Stocks</h1>
@@ -38,6 +49,12 @@
           </div>
           <div class="chart-wrap">
             <canvas id="priceChart" aria-label="Price history chart"></canvas>
+          </div>
+          <div class="mobile-controls" aria-label="Mobile controls">
+            <button id="prevAssetBtn" class="nav-btn" type="button">Prev</button>
+            <button id="nextAssetBtn" class="nav-btn" type="button">Next</button>
+            <button id="mobileBuyBtn" class="buy-btn" type="button">Buy</button>
+            <button id="mobileSellBtn" class="sell-btn" type="button">Sell</button>
           </div>
         </section>
 
