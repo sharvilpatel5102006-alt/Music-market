@@ -72,6 +72,45 @@ const TOP_ARTISTS = [
   "OneRepublic"
 ];
 
+const MUST_INCLUDE_ARTISTS = [
+  "Taylor Swift",
+  "Drake",
+  "The Weeknd",
+  "Bad Bunny",
+  "SZA",
+  "Travis Scott",
+  "Kendrick Lamar",
+  "Post Malone",
+  "Ariana Grande",
+  "Olivia Rodrigo",
+  "Billie Eilish",
+  "Doja Cat",
+  "Dua Lipa",
+  "Morgan Wallen",
+  "Luke Combs",
+  "Zach Bryan",
+  "Ed Sheeran",
+  "Justin Bieber",
+  "Rihanna",
+  "Beyonce",
+  "Bruno Mars",
+  "Lady Gaga",
+  "Selena Gomez",
+  "Miley Cyrus",
+  "Eminem",
+  "Kanye West",
+  "Future",
+  "J. Cole",
+  "21 Savage",
+  "Metro Boomin",
+  "Karol G",
+  "Shakira",
+  "BTS",
+  "BLACKPINK",
+  "Coldplay",
+  "Imagine Dragons"
+];
+
 const assets = buildAssetsFromNames(buildFallbackArtists(TARGET_ARTIST_COUNT));
 
 const ui = {
@@ -131,6 +170,13 @@ function buildFallbackArtists(totalCount) {
   return Array.from(new Set(TOP_ARTISTS)).slice(0, totalCount);
 }
 
+function normalizeArtistName(name) {
+  return name
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function isGeneratedStyleName(name) {
   const normalized = name.toLowerCase();
   return (
@@ -179,7 +225,7 @@ function parseTopArtistsFromChartmasters(text) {
     }
 
     const rank = Number(match[1]);
-    const artistName = match[2].replace(/\s+/g, " ").trim();
+    const artistName = normalizeArtistName(match[2]);
 
     if (
       Number.isNaN(rank) ||
@@ -197,6 +243,45 @@ function parseTopArtistsFromChartmasters(text) {
   });
 
   return names;
+}
+
+function prioritizePopularArtists(names) {
+  const seen = new Set();
+  const normalizedToOriginal = new Map();
+
+  names.forEach((name) => {
+    const normalized = normalizeArtistName(name);
+    if (!normalized || isGeneratedStyleName(normalized)) {
+      return;
+    }
+    if (!normalizedToOriginal.has(normalized.toLowerCase())) {
+      normalizedToOriginal.set(normalized.toLowerCase(), normalized);
+    }
+  });
+
+  const prioritized = [];
+
+  MUST_INCLUDE_ARTISTS.forEach((mustName) => {
+    const normalizedMust = normalizeArtistName(mustName).toLowerCase();
+    const match = normalizedToOriginal.get(normalizedMust);
+
+    if (match && !seen.has(match.toLowerCase())) {
+      seen.add(match.toLowerCase());
+      prioritized.push(match);
+    }
+  });
+
+  names.forEach((name) => {
+    const normalized = normalizeArtistName(name);
+    const key = normalized.toLowerCase();
+    if (!normalized || seen.has(key) || isGeneratedStyleName(normalized)) {
+      return;
+    }
+    seen.add(key);
+    prioritized.push(normalized);
+  });
+
+  return prioritized.slice(0, TARGET_ARTIST_COUNT);
 }
 
 async function fetchTextWithTimeout(url, timeoutMs) {
@@ -239,7 +324,7 @@ async function loadRealArtistsFromWikidata() {
   const names = [];
 
   bindings.forEach((item) => {
-    const name = (item?.artistLabel?.value || "").trim();
+    const name = normalizeArtistName(item?.artistLabel?.value || "");
     if (!name || isGeneratedStyleName(name) || seen.has(name)) {
       return;
     }
@@ -247,11 +332,13 @@ async function loadRealArtistsFromWikidata() {
     names.push(name);
   });
 
-  if (names.length < TARGET_ARTIST_COUNT) {
+  const prioritized = prioritizePopularArtists(names);
+
+  if (prioritized.length < TARGET_ARTIST_COUNT) {
     throw new Error("wikidata returned too few artists");
   }
 
-  return names.slice(0, TARGET_ARTIST_COUNT);
+  return prioritized.slice(0, TARGET_ARTIST_COUNT);
 }
 
 function basePriceFromIndex(index) {
@@ -724,7 +811,7 @@ async function initMarket() {
 
   try {
     const realArtists = await loadRealTopArtists();
-    resetMarketData(realArtists);
+    resetMarketData(prioritizePopularArtists(realArtists));
     artistDataSource = "chartmasters real artists";
   } catch (error) {
     try {
