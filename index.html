@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Music Market</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+    <script src="script.js" defer></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="watchlist" aria-label="Music assets">
+        <div class="watchlist-header">
+          <h1>Music Stocks</h1>
+          <span class="market-pill">Simulated</span>
+        </div>
+        <ul id="assetList" class="asset-list" role="listbox" aria-label="Asset list"></ul>
+      </aside>
+
+      <main class="main-panel">
+        <section class="chart-card">
+          <div class="chart-header">
+            <div>
+              <h2 id="assetName">-</h2>
+              <p id="assetTicker" class="ticker">-</p>
+            </div>
+            <div class="price-block">
+              <p id="assetPrice" class="price">$0.00</p>
+              <p id="assetChange" class="change">0.00%</p>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="priceChart" aria-label="Price history chart"></canvas>
+          </div>
+        </section>
+
+        <section class="trade-card" aria-label="Trade actions">
+          <h3>Trade</h3>
+          <p class="trade-caption">Market order simulation for selected song.</p>
+          <div class="trade-buttons">
+            <button id="buyBtn" class="buy-btn" type="button">Buy</button>
+            <button id="sellBtn" class="sell-btn" type="button">Sell</button>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
