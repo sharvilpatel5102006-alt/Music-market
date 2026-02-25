@@ -4,7 +4,7 @@ const VOLATILITY = 0.007;
 const BUY_IMPACT = 0.012;
 const SELL_IMPACT = -0.012;
 const LISTENER_REFRESH_MS = 60000;
-const TARGET_ARTIST_COUNT = 1000;
+const TARGET_ARTIST_COUNT = 500;
 const STARTING_CASH = 25000;
 const REAL_ARTISTS_SOURCE_URLS = [
   "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/",
