@@ -416,21 +416,30 @@ function initMarket() {
 
 function enterApp() {
   if (ui.loginScreen) {
-    ui.loginScreen.style.display = "none";
     ui.loginScreen.classList.add("app-hidden");
   }
 
   if (ui.appShell) {
-    ui.appShell.style.display = "grid";
     ui.appShell.classList.remove("app-hidden");
   }
 
-  document.documentElement.style.overflow = "auto";
-  document.body.style.overflow = "auto";
+  document.body.classList.remove("login-active");
+  document.documentElement.style.overflow = "";
+  document.body.style.overflow = "";
   initMarket();
 }
 
 function init() {
+  if (ui.loginScreen) {
+    ui.loginScreen.classList.remove("app-hidden");
+  }
+
+  if (ui.appShell) {
+    ui.appShell.classList.add("app-hidden");
+  }
+
+  document.body.classList.add("login-active");
+
   if (ui.loginBtn) {
     ui.loginBtn.addEventListener("click", enterApp);
   }

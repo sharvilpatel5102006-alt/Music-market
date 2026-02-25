@@ -34,11 +34,23 @@ body {
   display: none;
 }
 
+.app-shell.app-hidden,
+.login-screen.app-hidden {
+  display: none !important;
+}
+
 .login-screen {
-  min-height: 100vh;
+  position: fixed;
+  inset: 0;
+  min-height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
+  z-index: 9999;
+}
+
+body.login-active {
+  overflow: hidden;
 }
 
 .login-card {
@@ -325,58 +337,123 @@ button:active {
 @media (max-width: 960px) {
   body {
     overflow-y: auto;
+    overscroll-behavior-y: contain;
   }
 
   .app-shell {
     grid-template-columns: 1fr;
     height: auto;
-    min-height: 100vh;
-    gap: 14px;
-    padding: 14px;
-    padding-bottom: 88px;
+    min-height: 100dvh;
+    gap: 12px;
+    padding: 12px;
+    padding-bottom: 16px;
   }
 
   .watchlist-header {
-    padding: 14px 16px;
+    padding: 12px 14px;
   }
 
   .asset-list {
-    display: block;
-    overflow-y: auto;
-    max-height: 240px;
-    padding: 10px;
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(190px, 72vw);
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 10px;
+    max-height: none;
+    padding: 10px 12px 12px;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
   }
 
   .asset-item {
-    margin-bottom: 8px;
+    margin: 0;
+    min-height: 86px;
+    scroll-snap-align: start;
+    align-content: center;
+  }
+
+  .asset-title {
+    font-size: 0.92rem;
+  }
+
+  .asset-price {
+    font-size: 0.9rem;
   }
 
   .chart-card {
-    padding: 16px;
+    padding: 14px;
+    gap: 14px;
   }
 
   .chart-header h2 {
-    font-size: 1.2rem;
+    font-size: 1.12rem;
+    line-height: 1.2;
+  }
+
+  .ticker,
+  .listeners {
+    font-size: 0.8rem;
   }
 
   .price {
-    font-size: 1.25rem;
+    font-size: 1.12rem;
   }
 
   .chart-wrap {
-    min-height: 260px;
+    min-height: 220px;
   }
 
   .mobile-controls {
     display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .mobile-controls button {
+    min-height: 48px;
+    font-size: 0.92rem;
+    border-radius: 11px;
   }
 
   .trade-card {
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    padding: 14px 16px;
-    z-index: 20;
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .login-screen {
+    padding: 16px;
+  }
+
+  .login-card {
+    border-radius: 16px;
+    padding: 22px 18px;
+  }
+
+  .login-card h1 {
+    font-size: 1.45rem;
+  }
+
+  .watchlist-header h1 {
+    font-size: 1rem;
+  }
+
+  .market-pill {
+    font-size: 0.7rem;
+    padding: 4px 8px;
+  }
+
+  .asset-list {
+    grid-auto-columns: minmax(172px, 78vw);
+    padding: 8px 10px 10px;
+  }
+
+  .chart-header {
+    gap: 10px;
+  }
+
+  .chart-wrap {
+    min-height: 195px;
   }
 }
