@@ -10,6 +10,14 @@ const REAL_ARTISTS_SOURCE_URLS = [
   "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/",
   "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/?view=list"
 ];
+const WIKIDATA_SPOTIFY_ARTISTS_API =
+  "https://query.wikidata.org/sparql?format=json&query=" +
+  encodeURIComponent(
+    "SELECT ?artistLabel WHERE { " +
+      "?artist wdt:P2205 ?spotifyId. " +
+      "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". } " +
+    "} LIMIT 1200"
+  );
 
 const TOP_ARTISTS = [
   "Taylor Swift",
@@ -98,7 +106,7 @@ let listenerReqVersion = 0;
 let marketStarted = false;
 let watchlistTick = 0;
 let filteredIndices = assets.map((_, index) => index);
-let artistDataSource = "fallback seed list";
+let artistDataSource = "local real shortlist";
 const listenerCache = new Map();
 const account = {
   name: "Sharvil Patel",
@@ -120,19 +128,7 @@ function buildAssetsFromNames(names) {
 }
 
 function buildFallbackArtists(totalCount) {
-  const unique = Array.from(new Set(TOP_ARTISTS));
-  let page = 1;
-
-  while (unique.length < totalCount) {
-    TOP_ARTISTS.forEach((name) => {
-      if (unique.length < totalCount) {
-        unique.push(`${name} Vol.${page}`);
-      }
-    });
-    page += 1;
-  }
-
-  return unique.slice(0, totalCount);
+  return Array.from(new Set(TOP_ARTISTS)).slice(0, totalCount);
 }
 
 function resetMarketData(artistNames) {
@@ -218,6 +214,29 @@ async function loadRealTopArtists() {
   }
 
   throw new Error("could not load real top artists");
+}
+
+async function loadRealArtistsFromWikidata() {
+  const sourceText = await fetchTextWithTimeout(WIKIDATA_SPOTIFY_ARTISTS_API, 12000);
+  const payload = JSON.parse(sourceText);
+  const bindings = payload?.results?.bindings || [];
+  const seen = new Set();
+  const names = [];
+
+  bindings.forEach((item) => {
+    const name = (item?.artistLabel?.value || "").trim();
+    if (!name || seen.has(name)) {
+      return;
+    }
+    seen.add(name);
+    names.push(name);
+  });
+
+  if (names.length < TARGET_ARTIST_COUNT) {
+    throw new Error("wikidata returned too few artists");
+  }
+
+  return names.slice(0, TARGET_ARTIST_COUNT);
 }
 
 function basePriceFromIndex(index) {
@@ -691,10 +710,16 @@ async function initMarket() {
   try {
     const realArtists = await loadRealTopArtists();
     resetMarketData(realArtists);
-    artistDataSource = "live real artists";
+    artistDataSource = "chartmasters real artists";
   } catch (error) {
-    resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
-    artistDataSource = "fallback seed list";
+    try {
+      const wikidataArtists = await loadRealArtistsFromWikidata();
+      resetMarketData(wikidataArtists);
+      artistDataSource = "wikidata real artists";
+    } catch (nestedError) {
+      resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
+      artistDataSource = "local real shortlist";
+    }
   }
 
   marketStarted = true;
