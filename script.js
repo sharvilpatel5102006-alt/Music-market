@@ -268,6 +268,14 @@ function prioritizePopularArtists(names) {
     if (match && !seen.has(match.toLowerCase())) {
       seen.add(match.toLowerCase());
       prioritized.push(match);
+      return;
+    }
+
+    const fallbackName = normalizeArtistName(mustName);
+    const fallbackKey = fallbackName.toLowerCase();
+    if (!seen.has(fallbackKey)) {
+      seen.add(fallbackKey);
+      prioritized.push(fallbackName);
     }
   });
 
