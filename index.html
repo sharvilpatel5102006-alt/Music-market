@@ -14,17 +14,17 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
     <script src="script.js" defer></script>
   </head>
-  <body>
+  <body class="login-active">
     <section id="loginScreen" class="login-screen" aria-label="Login">
       <div class="login-card">
         <p class="login-kicker">Music Market</p>
         <h1>Welcome Back</h1>
         <p class="login-copy">Tap once to enter your artist market dashboard.</p>
-        <button id="loginBtn" class="login-btn" type="button" onclick="document.getElementById('loginScreen').style.display='none';document.getElementById('appShell').style.display='grid';if(window.enterApp){window.enterApp();}">Log In</button>
+        <button id="loginBtn" class="login-btn" type="button">Log In</button>
       </div>
     </section>
 
-    <div id="appShell" class="app-shell app-hidden" style="display:none">
+    <div id="appShell" class="app-shell app-hidden">
       <aside class="watchlist" aria-label="Artist assets">
         <div class="watchlist-header">
           <h1>Artist Stocks</h1>
