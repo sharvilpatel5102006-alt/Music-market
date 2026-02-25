@@ -4,33 +4,25 @@ const VOLATILITY = 0.007;
 const BUY_IMPACT = 0.012;
 const SELL_IMPACT = -0.012;
 const LISTENER_REFRESH_MS = 60000;
-const TARGET_ARTIST_COUNT = 100;
+const TARGET_ARTIST_COUNT = 500;
 const STARTING_CASH = 25000;
-const REAL_ARTISTS_SOURCE_URLS = [
-  "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/",
-  "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/?view=list"
+const KWORB_SOURCE_URLS = [
+  "https://r.jina.ai/http://kworb.net/spotify/listeners.html",
+  "https://r.jina.ai/http://kworb.net/spotify/listeners.html?show=all"
 ];
-const WIKIDATA_SPOTIFY_ARTISTS_API =
-  "https://query.wikidata.org/sparql?format=json&query=" +
-  encodeURIComponent(
-    "SELECT ?artistLabel WHERE { " +
-      "?artist wdt:P2205 ?spotifyId. " +
-      "SERVICE wikibase:label { bd:serviceParam wikibase:language \"en\". } " +
-    "} LIMIT 1200"
-  );
 
 const TOP_ARTISTS = [
   "Bruno Mars",
   "Bad Bunny",
   "The Weeknd",
   "Rihanna",
-  "Ariana Grande",
   "Taylor Swift",
   "Justin Bieber",
   "Lady Gaga",
   "Coldplay",
   "Billie Eilish",
   "Drake",
+  "Ariana Grande",
   "J Balvin",
   "Ed Sheeran",
   "David Guetta",
@@ -38,16 +30,16 @@ const TOP_ARTISTS = [
   "Kendrick Lamar",
   "Maroon 5",
   "Eminem",
-  "Kanye West",
-  "Post Malone",
   "SZA",
   "Calvin Harris",
+  "Kanye West",
   "Sabrina Carpenter",
   "Pitbull",
   "Lana Del Rey",
   "Dua Lipa",
   "Daddy Yankee",
   "Sia",
+  "Post Malone",
   "Harry Styles",
   "Katy Perry",
   "Zara Larsson",
@@ -262,35 +254,65 @@ function resetMarketData(artistNames) {
   }
 }
 
-function parseTopArtistsFromChartmasters(text) {
+function parseTopArtistsFromKworb(text) {
   const lines = text.split("\n");
   const names = [];
   const seen = new Set();
+  let index = 0;
 
-  lines.forEach((line) => {
-    const cleaned = line.trim();
-    const match = cleaned.match(/^(\d{1,4})\s+(.+?)\s+(\d[\d,]*)$/);
-    if (!match) {
-      return;
+  while (index < lines.length) {
+    const cleaned = lines[index].trim();
+    index += 1;
+
+    if (!cleaned) {
+      continue;
     }
 
-    const rank = Number(match[1]);
-    const artistName = normalizeArtistName(match[2]);
+    const inlineMatch = cleaned.match(/^(\d{1,4})\s+(.+?)\s+(\d{1,3}(?:,\d{3})+)/);
+    if (inlineMatch) {
+      const rank = Number(inlineMatch[1]);
+      const artistName = normalizeArtistName(inlineMatch[2]);
 
-    if (
-      Number.isNaN(rank) ||
-      rank < 1 ||
-      rank > TARGET_ARTIST_COUNT ||
-      !artistName ||
-      isGeneratedStyleName(artistName) ||
-      seen.has(artistName)
-    ) {
-      return;
+      if (
+        !Number.isNaN(rank) &&
+        rank >= 1 &&
+        rank <= TARGET_ARTIST_COUNT &&
+        artistName &&
+        !isGeneratedStyleName(artistName) &&
+        !seen.has(artistName.toLowerCase())
+      ) {
+        seen.add(artistName.toLowerCase());
+        names.push(artistName);
+      }
+      continue;
     }
 
-    seen.add(artistName);
+    if (!/^\d{1,4}$/.test(cleaned)) {
+      continue;
+    }
+
+    const rank = Number(cleaned);
+    if (Number.isNaN(rank) || rank < 1 || rank > TARGET_ARTIST_COUNT) {
+      continue;
+    }
+
+    while (index < lines.length && !lines[index].trim()) {
+      index += 1;
+    }
+    if (index >= lines.length) {
+      break;
+    }
+
+    const artistName = normalizeArtistName(lines[index]);
+    index += 1;
+
+    if (!artistName || isGeneratedStyleName(artistName) || seen.has(artistName.toLowerCase())) {
+      continue;
+    }
+
+    seen.add(artistName.toLowerCase());
     names.push(artistName);
-  });
+  }
 
   return names;
 }
@@ -357,11 +379,11 @@ async function fetchTextWithTimeout(url, timeoutMs) {
   }
 }
 
-async function loadRealTopArtists() {
-  for (const sourceUrl of REAL_ARTISTS_SOURCE_URLS) {
+async function loadTopArtistsFromKworb() {
+  for (const sourceUrl of KWORB_SOURCE_URLS) {
     try {
       const sourceText = await fetchTextWithTimeout(sourceUrl, 12000);
-      const parsedNames = parseTopArtistsFromChartmasters(sourceText);
+      const parsedNames = parseTopArtistsFromKworb(sourceText);
 
       if (parsedNames.length >= TARGET_ARTIST_COUNT) {
         return parsedNames.slice(0, TARGET_ARTIST_COUNT);
@@ -371,32 +393,7 @@ async function loadRealTopArtists() {
     }
   }
 
-  throw new Error("could not load real top artists");
-}
-
-async function loadRealArtistsFromWikidata() {
-  const sourceText = await fetchTextWithTimeout(WIKIDATA_SPOTIFY_ARTISTS_API, 12000);
-  const payload = JSON.parse(sourceText);
-  const bindings = payload?.results?.bindings || [];
-  const seen = new Set();
-  const names = [];
-
-  bindings.forEach((item) => {
-    const name = normalizeArtistName(item?.artistLabel?.value || "");
-    if (!name || isGeneratedStyleName(name) || seen.has(name)) {
-      return;
-    }
-    seen.add(name);
-    names.push(name);
-  });
-
-  const prioritized = prioritizePopularArtists(names);
-
-  if (prioritized.length < TARGET_ARTIST_COUNT) {
-    throw new Error("wikidata returned too few artists");
-  }
-
-  return prioritized.slice(0, TARGET_ARTIST_COUNT);
+  throw new Error("could not load kworb top artists");
 }
 
 function basePriceFromIndex(index) {
@@ -867,8 +864,14 @@ async function initMarket() {
     return;
   }
 
-  resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
-  artistDataSource = "chartmasters top 100 snapshot";
+  try {
+    const kworbArtists = await loadTopArtistsFromKworb();
+    resetMarketData(kworbArtists);
+    artistDataSource = "kworb top 500 snapshot";
+  } catch (error) {
+    resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
+    artistDataSource = "local fallback list";
+  }
 
   marketStarted = true;
   renderWatchlist();
