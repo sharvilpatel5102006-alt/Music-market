@@ -4,7 +4,7 @@ const VOLATILITY = 0.007;
 const BUY_IMPACT = 0.012;
 const SELL_IMPACT = -0.012;
 const LISTENER_REFRESH_MS = 60000;
-const TARGET_ARTIST_COUNT = 500;
+const TARGET_ARTIST_COUNT = 100;
 const STARTING_CASH = 25000;
 const REAL_ARTISTS_SOURCE_URLS = [
   "https://r.jina.ai/http://chartmasters.org/most-streamed-artists-ever-on-spotify/",
@@ -69,7 +69,57 @@ const TOP_ARTISTS = [
   "Stray Kids",
   "Coldplay",
   "Imagine Dragons",
-  "OneRepublic"
+  "OneRepublic",
+  "Shawn Mendes",
+  "Sam Smith",
+  "Maroon 5",
+  "Katy Perry",
+  "Khalid",
+  "Lana Del Rey",
+  "The Kid LAROI",
+  "Adele",
+  "Harry Styles",
+  "Nicky Jam",
+  "J Balvin",
+  "Maluma",
+  "Manuel Turizo",
+  "Rauw Alejandro",
+  "Myke Towers",
+  "Aitana",
+  "Quevedo",
+  "Bizarrap",
+  "Tainy",
+  "NATTI NATASHA",
+  "David Guetta",
+  "Calvin Harris",
+  "Kygo",
+  "Alan Walker",
+  "Marshmello",
+  "Tiësto",
+  "Martin Garrix",
+  "Avicii",
+  "The Chainsmokers",
+  "DJ Snake",
+  "Linkin Park",
+  "Arctic Monkeys",
+  "Red Hot Chili Peppers",
+  "Queen",
+  "The Beatles",
+  "Metallica",
+  "Nirvana",
+  "Guns N' Roses",
+  "AC/DC",
+  "Green Day",
+  "Slipknot",
+  "Paramore",
+  "Fall Out Boy",
+  "The 1975",
+  "TV Girl",
+  "Mitski",
+  "Cigarettes After Sex",
+  "Tame Impala",
+  "Glass Animals",
+  "Lorde"
 ];
 
 const MUST_INCLUDE_ARTISTS = [
@@ -817,20 +867,8 @@ async function initMarket() {
     return;
   }
 
-  try {
-    const realArtists = await loadRealTopArtists();
-    resetMarketData(prioritizePopularArtists(realArtists));
-    artistDataSource = "chartmasters real artists";
-  } catch (error) {
-    try {
-      const wikidataArtists = await loadRealArtistsFromWikidata();
-      resetMarketData(wikidataArtists);
-      artistDataSource = "wikidata real artists";
-    } catch (nestedError) {
-      resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
-      artistDataSource = "local real shortlist";
-    }
-  }
+  resetMarketData(buildFallbackArtists(TARGET_ARTIST_COUNT));
+  artistDataSource = "local curated top artists";
 
   marketStarted = true;
   renderWatchlist();
